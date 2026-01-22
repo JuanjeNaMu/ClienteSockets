@@ -27,8 +27,8 @@ public class HilosCliente implements Runnable {
             salida = new PrintWriter(socketCliente.getOutputStream(), true);
 
             salida.println("¡Bienvenido al Quiz en Tiempo Real!");
-            salida.println("Escribe tu nombre:");
             salida.println("Teclea EXIT para salir");
+            salida.println("Escribe tu nombre:");
 
             nombre = entrada.readLine();
             if (nombre == null || nombre.trim().isEmpty()) {
