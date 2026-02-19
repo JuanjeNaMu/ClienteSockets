@@ -19,8 +19,8 @@ public class Cliente {
         System.out.println("Cliente Quiz - Conectando...");
 
         //Conexión TCP con el servidor en puerto 8080
-        try(Socket socket = new Socket("52.201.91.206", 8080)){
-            //try(Socket socket = new Socket("localhost", 8080)){
+        //try(Socket socket = new Socket("52.201.91.206", 8080)){
+            try(Socket socket = new Socket("localhost", 8080)){
                 System.out.println("Conectado al servidor");
 
                 // Streams para comunicación con el servidor
@@ -54,10 +54,7 @@ public class Cliente {
                     // Valida que sea una respuesta válida (A, B, C, D) de un solo carácter
                     if (mensaje.length() == 1 && Pattern.matches("[a-dA-D]", mensaje)) {
                         // Para tu servidor (con HTTP):
-                        // salida.println(ProtocoloHTTP.crearPeticionPOST("/respuesta", mensaje.toUpperCase()));
-
-                        // Para el servidor del compañero (sin HTTP, directo):
-                        salida.println(mensaje.toUpperCase());                    }
+                        salida.println(ProtocoloHTTP.crearPeticionPOST("/respuesta", mensaje.toUpperCase()));}
                     // Envía otros mensajes (como el nombre al conectarse)
                     else if (!mensaje.isEmpty()) {
                         salida.println(mensaje);
