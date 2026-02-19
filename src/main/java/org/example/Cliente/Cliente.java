@@ -8,65 +8,154 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
 import java.util.Scanner;
-import java.util.regex.Pattern;
 
 /**
- * Cliente para el sistema de Quiz. Se conecta al servidor, responde preguntas y ve rankings.
+ * Cliente para el sistema de Quiz.
+ *
+ * Flujo:
+ * 1. Se conecta al servidor con POST /conectar
+ * 2. Recibe bienvenida (Tipo-Mensaje: BIENVENIDA)
+ * 3. Escucha mensajes del servidor (PREGUNTA, RANKING, RESULTADO, etc.)
+ * 4. Cuando llega PREGUNTA, el jugador responde A/B/C/D
+ * 5. Solo se permite 1 respuesta por pregunta
  */
 public class Cliente {
 
+    // Cambiar a la IP del servidor si no es local
+    private static final String HOST = "172.20.10.2";
+    //private static final String HOST = "localhost";
+    private static final int PUERTO = 8080;
+
     public static void main(String[] args) {
-        System.out.println("Cliente Quiz - Conectando...");
+        Scanner scanner = new Scanner(System.in);
 
-        //Conexión TCP con el servidor en puerto 8080
-        //try(Socket socket = new Socket("52.201.91.206", 8080)){
-            try(Socket socket = new Socket("localhost", 8080)){
-                System.out.println("Conectado al servidor");
+        System.out.println("===========================================");
+        System.out.println("       CLIENTE QUIZ - org.example");
+        System.out.println("===========================================");
+        System.out.print("Ingresa tu nombre de jugador: ");
+        String nombre = scanner.nextLine().trim();
 
-                // Streams para comunicación con el servidor
-                BufferedReader entrada = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-                PrintWriter salida = new PrintWriter(socket.getOutputStream(), true);
-                Scanner scanner = new Scanner(System.in);
+        if (nombre.isEmpty()) {
+            nombre = "Jugador_" + System.currentTimeMillis() % 1000;
+            System.out.println("Usando nombre: " + nombre);
+        }
 
-                // Hilo para recibir mensajes del servidor sin bloquear la entrada del usuario
-                Thread lectura = new Thread(() -> {
-                    try {
-                        String mensajeServidor;
-                        while ((mensajeServidor = entrada.readLine()) != null) {
-                            System.out.println(ProtocoloHTTP.extraerBody(mensajeServidor));
+        final String nombreJugador = nombre;
+
+        try (Socket socket = new Socket(HOST, PUERTO)) {
+            System.out.println("Conectado al servidor en " + HOST + ":" + PUERTO);
+
+            BufferedReader entrada = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            PrintWriter salida = new PrintWriter(socket.getOutputStream(), true);
+
+            // 1. Enviar petición HTTP de conexión (POST /conectar)
+            ProtocoloHTTP.enviarPeticionConectar(salida, nombreJugador);
+
+            // Estado: controla si podemos responder a una pregunta
+            final boolean[] esperandoRespuesta = {false};
+            final boolean[] conectado = {true};
+
+            // 2. Hilo para recibir mensajes del servidor
+            Thread lectura = new Thread(() -> {
+                try {
+                    while (conectado[0]) {
+                        // Leer un mensaje HTTP completo (hasta END_HTTP)
+                        ProtocoloHTTP.MensajeHTTP respuesta = ProtocoloHTTP.recibir(entrada);
+
+                        if (respuesta == null) {
+                            System.out.println("Servidor desconectado.");
+                            conectado[0] = false;
+                            break;
                         }
-                    } catch (IOException e) {
-                        System.out.println("Desconectado del servidor");
+
+                        // Procesar según Tipo-Mensaje
+                        String tipo = respuesta.getTipoMensaje();
+
+                        switch (tipo) {
+                            case "BIENVENIDA":
+                                System.out.println("\n" + respuesta.cuerpo);
+                                break;
+
+                            case "PREGUNTA":
+                                esperandoRespuesta[0] = true;
+                                System.out.println(respuesta.cuerpo);
+                                break;
+
+                            case "RESULTADO":
+                                System.out.println("\n>> " + respuesta.cuerpo);
+                                break;
+
+                            case "RANKING":
+                                System.out.println("\n" + respuesta.cuerpo);
+                                break;
+
+                            case "NEXT":
+                                System.out.println("\n... Siguiente pregunta en breve ...\n");
+                                break;
+
+                            case "ESPERANDO":
+                                System.out.println(respuesta.cuerpo);
+                                break;
+
+                            case "FIN":
+                                System.out.println("\n" + respuesta.cuerpo);
+                                System.out.println("\nEl quiz ha terminado. Escribe EXIT para cerrar.");
+                                esperandoRespuesta[0] = false;
+                                break;
+
+                            case "ERROR":
+                                System.out.println("[ERROR] " + respuesta.cuerpo);
+                                break;
+
+                            default:
+                                // Mensaje desconocido, mostrar cuerpo igualmente
+                                if (!respuesta.cuerpo.isEmpty()) {
+                                    System.out.println(respuesta.cuerpo);
+                                }
+                        }
                     }
-                });
-                lectura.start();
-
-                // Bucle principal: captura y envía respuestas del usuario
-                while (true) {
-                    String mensaje = scanner.nextLine().trim();
-
-                    // Comando para salir del programa
-                    if (mensaje.equalsIgnoreCase("EXIT")) {
-                        salida.println("EXIT");
-                        break;
-                    }
-
-                    // Valida que sea una respuesta válida (A, B, C, D) de un solo carácter
-                    if (mensaje.length() == 1 && Pattern.matches("[a-dA-D]", mensaje)) {
-                        // Para tu servidor (con HTTP):
-                        salida.println(ProtocoloHTTP.crearPeticionPOST("/respuesta", mensaje.toUpperCase()));}
-                    // Envía otros mensajes (como el nombre al conectarse)
-                    else if (!mensaje.isEmpty()) {
-                        salida.println(mensaje);
+                } catch (IOException e) {
+                    if (conectado[0]) {
+                        System.out.println("Conexión perdida con el servidor.");
                     }
                 }
+            });
+            lectura.setDaemon(true);
+            lectura.start();
 
-                scanner.close();
-                System.out.println("Sesión terminada");
+            // 3. Bucle principal: capturar input del jugador
+            while (conectado[0]) {
+                String mensaje = scanner.nextLine().trim().toUpperCase();
 
-            } catch (IOException e) {
-                System.out.println("No se pudo conectar al servidor: " + e.getMessage());
-                System.out.println("Asegúrate de que el servidor esté ejecutándose en localhost:8080");
+                if (mensaje.isEmpty()) continue;
+
+                // Comando para salir
+                if (mensaje.equals("EXIT") || mensaje.equals("SALIR")) {
+                    conectado[0] = false;
+                    break;
+                }
+
+                if (!esperandoRespuesta[0]) {
+                    System.out.println("Espera a que llegue una pregunta...");
+                    continue;
+                }
+
+                // Validar respuesta A/B/C/D
+                if (mensaje.length() == 1 && "ABCD".contains(mensaje)) {
+                    char respuesta = mensaje.charAt(0);
+                    ProtocoloHTTP.enviarPeticionRespuesta(salida, nombreJugador, respuesta);
+                    esperandoRespuesta[0] = false; // Solo 1 respuesta por pregunta
+                } else {
+                    System.out.println("Respuesta inválida. Escribe solo A, B, C o D.");
+                }
             }
+
+            scanner.close();
+            System.out.println("Sesión terminada.");
+
+        } catch (IOException e) {
+            System.out.println("No se pudo conectar al servidor: " + e.getMessage());
+            System.out.println("Asegúrate de que el servidor esté ejecutándose en " + HOST + ":" + PUERTO);
         }
     }
+}
