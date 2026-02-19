@@ -1,5 +1,7 @@
 package org.example.Servidor;
 
+import org.example.Protocolo.ProtocoloHTTP;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -51,7 +53,7 @@ public class HilosCliente implements Runnable {
                     break;
                 }
                 // Envía la respuesta al servidor para procesarla
-                Servidor.procesarRespuesta(this, mensaje);
+                Servidor.procesarRespuesta(this, ProtocoloHTTP.extraerBody(mensaje));
             }
 
         } catch (IOException e) {

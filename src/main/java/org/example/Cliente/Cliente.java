@@ -1,5 +1,7 @@
 package org.example.Cliente;
 
+import org.example.Protocolo.ProtocoloHTTP;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -17,8 +19,8 @@ public class Cliente {
         System.out.println("Cliente Quiz - Conectando...");
 
         //Conexión TCP con el servidor en puerto 8080
-        //try(Socket socket = new Socket("192.168.40.112", 8080)){
-            try(Socket socket = new Socket("localhost", 8080)){
+        try(Socket socket = new Socket("52.201.91.206", 8080)){
+            //try(Socket socket = new Socket("localhost", 8080)){
                 System.out.println("Conectado al servidor");
 
                 // Streams para comunicación con el servidor
@@ -31,7 +33,7 @@ public class Cliente {
                     try {
                         String mensajeServidor;
                         while ((mensajeServidor = entrada.readLine()) != null) {
-                            System.out.println(mensajeServidor);
+                            System.out.println(ProtocoloHTTP.extraerBody(mensajeServidor));
                         }
                     } catch (IOException e) {
                         System.out.println("Desconectado del servidor");
@@ -51,8 +53,11 @@ public class Cliente {
 
                     // Valida que sea una respuesta válida (A, B, C, D) de un solo carácter
                     if (mensaje.length() == 1 && Pattern.matches("[a-dA-D]", mensaje)) {
-                        salida.println(mensaje.toUpperCase()); // Convierte a mayúscula
-                    }
+                        // Para tu servidor (con HTTP):
+                        // salida.println(ProtocoloHTTP.crearPeticionPOST("/respuesta", mensaje.toUpperCase()));
+
+                        // Para el servidor del compañero (sin HTTP, directo):
+                        salida.println(mensaje.toUpperCase());                    }
                     // Envía otros mensajes (como el nombre al conectarse)
                     else if (!mensaje.isEmpty()) {
                         salida.println(mensaje);

@@ -1,5 +1,7 @@
 package org.example.Servidor;
 
+import org.example.Protocolo.ProtocoloHTTP;
+
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -145,7 +147,7 @@ public class Servidor {
 
         respuesta = respuesta.toUpperCase();
         if (!respuesta.matches("[ABCD]")) {
-            cliente.enviarMensaje("Respuesta inválida. Usa A, B, C o D.");
+            cliente.enviarMensaje(ProtocoloHTTP.crearRespuesta400("Respuesta inválida. Usa A, B, C o D."));
             return;
         }
 
@@ -155,7 +157,7 @@ public class Servidor {
 
         respuestas.put(cliente, new RespuestaCliente(respuesta, tiempo, correcta));
 
-        cliente.enviarMensaje("Respuesta '" + respuesta + "' registrada en " + tiempo + "ms");
+        cliente.enviarMensaje(ProtocoloHTTP.crearRespuesta200("Respuesta '" + respuesta + "' registrada en " + tiempo + "ms"));
         System.out.println(cliente.getNombre() + " respondió: " + respuesta +
                 " (" + tiempo + "ms)" + (correcta ? " ✓" : " ✗"));
 
